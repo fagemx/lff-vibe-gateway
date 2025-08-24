@@ -1,0 +1,58 @@
+{
+  "name": "@lff-vibe/mcp-gateway",
+  "version": "1.0.0",
+  "description": "LFF-VIBE MCP Gateway - Connect BigGo MCP Client to LFF-VIBE Resume Analysis Service",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "bin": {
+    "lff-vibe-gateway": "./dist/src/lff-vibe-gateway.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build",
+    "start": "node dist/src/lff-vibe-gateway.js",
+    "dev": "tsc && node dist/src/lff-vibe-gateway.js",
+    "test": "echo \"✅ Tests will be added in future versions\"",
+    "lint": "echo \"✅ Linting will be added in future versions\"",
+    "clean": "rm -rf dist",
+    "prepack": "npm run clean && npm run build"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "examples"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.3",
+    "eventsource": "^2.0.2"
+  },
+  "devDependencies": {
+    "@types/eventsource": "^1.1.15",
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "mcp",
+    "gateway", 
+    "resume-analysis",
+    "lff-vibe",
+    "protocol-bridge"
+  ],
+  "author": "LFF-VIBE Team",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lff-vibe/mcp-gateway.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lff-vibe/mcp-gateway/issues"
+  },
+  "homepage": "https://github.com/lff-vibe/mcp-gateway#readme",
+  "publishConfig": {
+    "access": "public"
+  }
+}

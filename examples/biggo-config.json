@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "lff-vibe-resume-analyzer": {
+      "transport": "stdio",
+      "enabled": true,
+      "command": "node",
+      "args": [
+        "/usr/local/lib/node_modules/@lff-vibe/mcp-gateway/dist/src/lff-vibe-gateway.js"
+      ],
+      "env": {
+        "MCP_SERVER_URL": "https://mcpice.com",
+        "LFF_VIBE_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
