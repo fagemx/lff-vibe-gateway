@@ -1,6 +1,6 @@
 {
   "name": "@lff-vibe/mcp-gateway",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "LFF-VIBE MCP Gateway - Connect BigGo MCP Client to LFF-VIBE Resume Analysis Service",
   "keywords": [
     "mcp",
