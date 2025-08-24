@@ -12,17 +12,36 @@ A specialized gateway service that bridges stdio-based MCP clients (like BigGo M
 
 ## 🚀 Quick Start
 
-### Installation
+### One-Command Usage (Recommended)
 
-Choose your preferred method:
+**No installation required!** Just use npx:
 
 ```bash
-# Using npm (recommended)
-npm install -g @lff-vibe/mcp-gateway
-
-# Using uvx (Python alternative)
-uvx @lff-vibe/mcp-gateway
+npx -y @lff-vibe/mcp-gateway@latest serve
 ```
+
+### BigGo MCP Client Configuration
+
+Copy this configuration to your BigGo MCP Client:
+
+```json
+{
+  "mcpServers": {
+    "lff-vibe-resume-analyzer": {
+      "transport": "stdio",
+      "enabled": true,
+      "command": "npx",
+      "args": ["-y", "@lff-vibe/mcp-gateway@latest", "serve"],
+      "env": {
+        "MCP_SERVER_URL": "https://mcpice.com",
+        "LFF_VIBE_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+**That's it!** No paths, no global installation needed.
 
 ### Configuration for BigGo MCP Client
 
