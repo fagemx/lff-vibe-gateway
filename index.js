@@ -24,11 +24,11 @@ let sseEndpoint, msgEndpoint;
 if (cleanBaseUrl.endsWith('/mcp')) {
     // Already has /mcp, so just add the specific paths
     sseEndpoint = `${cleanBaseUrl}/sse`;     // /mcp/sse -> Nginx rewrites to /sse
-    msgEndpoint = `${cleanBaseUrl.replace('/mcp', '')}/messages/`; // Remove /mcp for messages endpoint
+    msgEndpoint = `${cleanBaseUrl.replace('/mcp', '')}/message`; // Remove /mcp for message endpoint
 } else {
     // No /mcp, add the full paths
     sseEndpoint = `${cleanBaseUrl}/mcp/sse`;  // /mcp/sse -> Nginx rewrites to /sse  
-    msgEndpoint = `${cleanBaseUrl}/messages/`; // Direct to messages endpoint
+    msgEndpoint = `${cleanBaseUrl}/message`; // Direct to message endpoint
 }
 
 const baseUrl = cleanBaseUrl;
