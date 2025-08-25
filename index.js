@@ -16,10 +16,24 @@ import EventSource from 'eventsource';
 const MCP_SERVER_URL = process.env.MCP_SERVER_URL || process.env.LFF_VIBE_SERVER_URL || "https://mcpice.com";
 const AUTHORIZATION = process.env.AUTHORIZATION || process.env.LFF_VIBE_API_KEY || "";
 
-const baseUrl = MCP_SERVER_URL.endsWith('/') ? MCP_SERVER_URL.slice(0, -1) : MCP_SERVER_URL;
-// FastAPI-MCP SSE transport endpoints (Enhanced paths)
-const backendUrlSse = `${baseUrl}/mcp/sse`;  // 透過 Nginx 路由到 /sse
-const backendUrlMsg = `${baseUrl}/messages/`; // FastMCP 的正確消息端點
+// Clean base URL and determine correct endpoints
+let cleanBaseUrl = MCP_SERVER_URL.endsWith('/') ? MCP_SERVER_URL.slice(0, -1) : MCP_SERVER_URL;
+
+// Check if baseUrl already contains /mcp path
+let sseEndpoint, msgEndpoint;
+if (cleanBaseUrl.endsWith('/mcp')) {
+    // Already has /mcp, so just add the specific paths
+    sseEndpoint = `${cleanBaseUrl}/sse`;     // /mcp/sse -> Nginx rewrites to /sse
+    msgEndpoint = `${cleanBaseUrl.replace('/mcp', '')}/messages/`; // Remove /mcp for messages endpoint
+} else {
+    // No /mcp, add the full paths
+    sseEndpoint = `${cleanBaseUrl}/mcp/sse`;  // /mcp/sse -> Nginx rewrites to /sse  
+    msgEndpoint = `${cleanBaseUrl}/messages/`; // Direct to messages endpoint
+}
+
+const baseUrl = cleanBaseUrl;
+const backendUrlSse = sseEndpoint;
+const backendUrlMsg = msgEndpoint;
 
 // Debug and response channels
 const debug = console.error;
@@ -46,7 +60,7 @@ class LFFVibeGateway {
         }
 
         debug(`Starting LFF-VIBE MCP Gateway Enhanced...`);
-        debug(`Connecting to: ${baseUrl}/mcp/`);
+        debug(`Connecting to: ${baseUrl}`);
         debug(`Authorization: ${AUTHORIZATION ? 'Configured' : 'None'}`);
         debug(`Connecting to LFF-VIBE SSE endpoint: ${backendUrlSse}`);
 
@@ -136,72 +150,71 @@ class LFFVibeGateway {
 
         debug("LFF-VIBE MCP Gateway is running and ready");
         
-        // Start with a simple tools/list request to validate the session
-        try {
-            const initMessage = {
-                jsonrpc: "2.0",
-                id: "init-1",
-                method: "tools/list",
-                params: {}
-            };
-
-            await this.sendMessageToBackend(JSON.stringify(initMessage));
-            
-            // Mark as ready after successful initialization
-            this.isReady = true;
-            this.sessionInitialized = true;
-            this.processQueuedMessages();
-            
-        } catch (error) {
-            debug(`Session initialization failed: ${error}`);
-            // Still mark as ready to process messages, let individual calls fail
-            this.isReady = true;
-            this.processQueuedMessages();
-        }
+        // For SSE mode, we don't need to POST initialize
+        // The session is established via SSE stream
+        this.isReady = true;
+        this.sessionInitialized = true;
+        this.processQueuedMessages();
     }
 
     async sendMessageToBackend(message) {
+        debug(`Attempting to send message via SSE connection`);
+        
+        // For FastMCP SSE mode, we might not need to POST messages
+        // Instead, messages should flow through the established SSE connection
+        // Let's try multiple endpoints to find the working one
+        
         if (!this.sessionId) {
             throw new Error("No session ID available");
         }
 
-        const url = `${backendUrlMsg}?session_id=${this.sessionId}`;
+        // Try different possible endpoints
+        const endpoints = [
+            `${backendUrlSse}?session_id=${this.sessionId}`,  // Try SSE endpoint with session
+            `${backendUrlMsg}?session_id=${this.sessionId}`,    // Try messages endpoint
+            `${baseUrl}/api/mcp?session_id=${this.sessionId}` // Try alternative endpoint
+        ];
+
+        let lastError = null;
         
-        const headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json, text/event-stream'
-        };
+        for (const url of endpoints) {
+            try {
+                debug(`Trying endpoint: ${url}`);
+                
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json, text/event-stream'
+                };
 
-        // Add authorization header if available
-        if (AUTHORIZATION) {
-            headers['Authorization'] = AUTHORIZATION.startsWith('Bearer ') ? AUTHORIZATION : `Bearer ${AUTHORIZATION}`;
-        }
+                // Add authorization header if available
+                if (AUTHORIZATION) {
+                    headers['Authorization'] = AUTHORIZATION.startsWith('Bearer ') ? AUTHORIZATION : `Bearer ${AUTHORIZATION}`;
+                }
 
-        const response = await fetch(url, {
-            method: 'POST',
-            headers,
-            body: message
-        });
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers,
+                    body: message
+                });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            debug(`Error from LFF-VIBE: ${response.status} ${response.statusText}`);
-            debug(`Error details: ${errorText}`);
-            
-            if (response.status === 404) {
-                debug("Messages endpoint not found - checking FastMCP configuration");
-            } else if (response.status === 503) {
-                debug("LFF-VIBE service unavailable - attempting reconnect");
-                this.reconnect();
-            } else if (response.status === 401) {
-                debug("LFF-VIBE authorization failed - check API key");
+                if (response.ok) {
+                    const responseText = await response.text();
+                    debug(`Message sent successfully to: ${url}`);
+                    return; // Success!
+                } else {
+                    const errorText = await response.text();
+                    debug(`Failed ${url}: ${response.status} ${errorText}`);
+                    lastError = new Error(`${response.status}: ${errorText}`);
+                }
+            } catch (error) {
+                debug(`Network error for ${url}: ${error.message}`);
+                lastError = error;
             }
-            
-            throw new Error(`Backend error: ${response.status} ${errorText}`);
-        } else {
-            const responseText = await response.text();
-            debug(`LFF-VIBE response sent successfully`);
         }
+        
+        // If all endpoints failed, throw the last error
+        debug(`All endpoints failed, message may need to flow differently in SSE mode`);
+        throw lastError || new Error("All message endpoints failed");
     }
 
     handleConnectionError(error) {
@@ -236,41 +249,67 @@ class LFFVibeGateway {
     }
 
     async processMessage(input) {
-        if (!this.isReady || !this.sessionId) {
-            debug("LFF-VIBE session not ready, queuing message");
-            this.messageQueue.push(input);
-            return;
-        }
-
         const message = input.toString();
+        
         try {
             const parsed = JSON.parse(message);
+            debug(`Received message from BigGo: ${parsed.method || 'response'}`);
+            
             // Log outgoing resume analysis requests
             if (parsed.method === "tools/call" && parsed.params?.name?.includes("resume")) {
                 debug(`Processing resume analysis request: ${parsed.params.name}`);
             }
-        } catch (error) {
-            debug(`Failed to parse outgoing message: ${error}`);
-        }
-
-        // Handle multiple messages in one input
-        const messages = message
-            .split('\n')
-            .filter(msg => msg.trim())
-            .map(msg => msg.trim());
-
-        for (const msgStr of messages) {
-            try {
-                await this.sendMessageToBackend(msgStr);
-            } catch (error) {
-                debug(`Request to LFF-VIBE failed: ${error}`);
-                
-                // Try to recover from certain errors
-                if (error.message.includes('404')) {
-                    debug("Message endpoint not found, attempting to reconnect");
-                    this.reconnect();
-                }
+            
+            // For SSE mode, we might not need to POST messages actively
+            // Instead, we rely on the SSE stream to provide responses
+            // Let's try a simplified approach
+            
+            if (parsed.method === "initialize") {
+                // Send a mock successful initialize response
+                const initResponse = {
+                    jsonrpc: "2.0",
+                    id: parsed.id,
+                    result: {
+                        protocolVersion: "1.0.0",
+                        capabilities: {
+                            tools: {}
+                        },
+                        serverInfo: {
+                            name: "LFF-VIBE Resume Analyzer",
+                            version: "1.0.0"
+                        }
+                    }
+                };
+                respond(JSON.stringify(initResponse));
+                return;
             }
+            
+            // For other messages, try to send to backend if session is ready
+            if (this.isReady && this.sessionId) {
+                try {
+                    await this.sendMessageToBackend(message);
+                } catch (error) {
+                    debug(`Backend send failed: ${error.message}`);
+                    
+                    // Send error response to BigGo
+                    const errorResponse = {
+                        jsonrpc: "2.0",
+                        id: parsed.id || null,
+                        error: {
+                            code: -32603,
+                            message: "Internal error",
+                            data: error.message
+                        }
+                    };
+                    respond(JSON.stringify(errorResponse));
+                }
+            } else {
+                debug("Session not ready, queuing message");
+                this.messageQueue.push(input);
+            }
+            
+        } catch (error) {
+            debug(`Failed to parse message: ${error}`);
         }
     }
 

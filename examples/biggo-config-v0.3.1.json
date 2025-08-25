@@ -4,7 +4,7 @@
       "transport": "stdio",
       "enabled": true,
       "command": "npx",
-      "args": ["-y", "@lff-vibe/mcp-gateway@0.3.1", "serve"],
+      "args": ["-y", "@lff-vibe/mcp-gateway@0.3.2", "serve"],
       "env": {
         "MCP_SERVER_URL": "https://mcpice.com",
         "LFF_VIBE_API_KEY": "your-api-key-here"
