@@ -35,9 +35,37 @@ const baseUrl = cleanBaseUrl;
 const backendUrlSse = sseEndpoint;
 const backendUrlMsg = msgEndpoint;
 
-// Debug and response channels
-const debug = console.error;
-const respond = console.log;
+// Fix Windows encoding issues
+if (process.platform === 'win32') {
+    // Set proper encoding for Windows
+    process.stdout.setDefaultEncoding && process.stdout.setDefaultEncoding('utf8');
+    process.stderr.setDefaultEncoding && process.stderr.setDefaultEncoding('utf8');
+}
+
+// Debug and response channels with encoding safety
+const debug = (...args) => {
+    try {
+        console.error(...args);
+    } catch (encodingError) {
+        // Fallback to ASCII-safe output
+        const safeArgs = args.map(arg => 
+            typeof arg === 'string' ? arg.replace(/[^\x00-\x7F]/g, '?') : arg
+        );
+        console.error(...safeArgs);
+    }
+};
+
+const respond = (...args) => {
+    try {
+        console.log(...args);
+    } catch (encodingError) {
+        // Fallback to ASCII-safe output
+        const safeArgs = args.map(arg => 
+            typeof arg === 'string' ? arg.replace(/[^\x00-\x7F]/g, '?') : arg
+        );
+        console.log(...safeArgs);
+    }
+};
 
 class LFFVibeGateway {
     constructor() {
@@ -93,7 +121,7 @@ class LFFVibeGateway {
             // Handle session establishment from FastMCP
             this.eventSource.addEventListener("endpoint", (event) => {
                 debug(`Received endpoint event: ${event.data}`);
-                // FastMCP 格式：/messages/?session_id=xxxxx
+                // FastMCP format: /messages/?session_id=xxxxx
                 const match = event.data.match(/session_id=([^&\s]+)/);
                 if (match) {
                     const newSessionId = match[1];
