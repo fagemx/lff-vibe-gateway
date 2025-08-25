@@ -197,11 +197,11 @@ class LFFVibeGateway {
             throw new Error("No session ID available");
         }
 
-        // Try different possible endpoints
+        // Try different possible endpoints (using sessionId format like original MCPHub)
         const endpoints = [
-            `${backendUrlSse}?session_id=${this.sessionId}`,  // Try SSE endpoint with session
-            `${backendUrlMsg}?session_id=${this.sessionId}`,    // Try messages endpoint
-            `${baseUrl}/api/mcp?session_id=${this.sessionId}` // Try alternative endpoint
+            `${backendUrlSse}?sessionId=${this.sessionId}`,  // Try SSE endpoint with session
+            `${backendUrlMsg}?sessionId=${this.sessionId}`,    // Try messages endpoint  
+            `${baseUrl}/api/mcp?sessionId=${this.sessionId}` // Try alternative endpoint
         ];
 
         let lastError = null;
