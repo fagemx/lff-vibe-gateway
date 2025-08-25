@@ -25,6 +25,7 @@
   "files": [
     "bin/",
     "index.js",
+    "src/",
     "README.md",
     "LICENSE",
     "examples/"
