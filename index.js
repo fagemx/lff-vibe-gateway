@@ -436,21 +436,16 @@ class LFFVibeGateway {
             result: {
                 tools: [
                     {
-                        name: "mcp_lff-resume-analyzer_check_services",
+                        name: "check_services",
                         description: "Check if backend services are running",
                         inputSchema: {
                             type: "object",
-                            properties: {
-                                random_string: {
-                                    type: "string",
-                                    description: "Dummy parameter for no-parameter tools"
-                                }
-                            },
-                            required: ["random_string"]
+                            properties: {},
+                            required: []
                         }
                     },
                     {
-                        name: "mcp_lff-resume-analyzer_analyze_resume",
+                        name: "analyze_resume_from_path",
                         description: "Analyze PDF resume file. Use when user provides PDF path. Parameters: pdf_path (complete PDF file path) and job_requirements (target job requirements description)",
                         inputSchema: {
                             type: "object",
@@ -468,7 +463,7 @@ class LFFVibeGateway {
                         }
                     },
                     {
-                        name: "mcp_lff-resume-analyzer_analyze_resume_text",
+                        name: "analyze_resume_text",
                         description: "Analyze resume text content. Use when user provides resume text (not PDF file). Parameters: resume_text (resume content) and job_requirements (job requirements)",
                         inputSchema: {
                             type: "object",
