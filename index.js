@@ -178,17 +178,12 @@ class LFFVibeGateway {
 
         debug("LFF-VIBE MCP Gateway is running and ready");
         
-        // Mark as ready first
+        // Mark as ready
         this.isReady = true;
         this.sessionInitialized = true;
         
         // Process any queued messages
         this.processQueuedMessages();
-        
-        // Auto-request tools from backend to populate the tools list
-        setTimeout(() => {
-            this.requestToolsFromBackend();
-        }, 500);
     }
 
     async sendMessageToBackend(message) {
@@ -283,8 +278,20 @@ class LFFVibeGateway {
     }
 
     async processMessage(input) {
-        const message = input.toString();
+        const message = input.toString().trim();
         
+        // Handle multiple JSON messages in one input by splitting on newlines
+        const messages = message
+            .split('\n')
+            .filter(msg => msg.trim())
+            .map(msg => msg.trim());
+
+        for (const msgStr of messages) {
+            await this.processSingleMessage(msgStr);
+        }
+    }
+
+    async processSingleMessage(message) {
         try {
             const parsed = JSON.parse(message);
             debug(`Received message from BigGo: ${parsed.method || 'response'}`);
@@ -293,10 +300,6 @@ class LFFVibeGateway {
             if (parsed.method === "tools/call" && parsed.params?.name?.includes("resume")) {
                 debug(`Processing resume analysis request: ${parsed.params.name}`);
             }
-            
-            // For SSE mode, we might not need to POST messages actively
-            // Instead, we rely on the SSE stream to provide responses
-            // Let's try a simplified approach
             
             if (parsed.method === "initialize") {
                 // Send initialize response with actual tools
@@ -315,28 +318,20 @@ class LFFVibeGateway {
                     }
                 };
                 respond(JSON.stringify(initResponse));
-                
-                // Immediately request tools from backend after initialization
-                setTimeout(() => {
-                    this.requestToolsFromBackend();
-                }, 100);
+                debug("Sent initialize response to BigGo");
+                return;
+            }
+            
+            if (parsed.method === "notifications/initialized") {
+                // BigGo sent initialization complete notification
+                debug("BigGo initialization completed - ready for tools/list requests");
                 return;
             }
             
             if (parsed.method === "tools/list") {
-                // Handle tools/list request
+                // Handle tools/list request - always use fallback for now
                 debug("Received tools/list request from BigGo");
-                if (this.isReady && this.sessionId) {
-                    try {
-                        await this.sendMessageToBackend(message);
-                    } catch (error) {
-                        debug(`Failed to get tools: ${error.message}`);
-                        // Send fallback tools list
-                        this.sendFallbackToolsList(parsed.id);
-                    }
-                } else {
-                    this.sendFallbackToolsList(parsed.id);
-                }
+                this.sendFallbackToolsList(parsed.id);
                 return;
             }
             
@@ -376,32 +371,12 @@ class LFFVibeGateway {
                 return;
             }
             
-            // For other messages, try to send to backend if session is ready
-            if (this.isReady && this.sessionId) {
-                try {
-                    await this.sendMessageToBackend(message);
-                } catch (error) {
-                    debug(`Backend send failed: ${error.message}`);
-                    
-                    // Send error response to BigGo
-                    const errorResponse = {
-                        jsonrpc: "2.0",
-                        id: parsed.id || null,
-                        error: {
-                            code: -32603,
-                            message: "Internal error",
-                            data: error.message
-                        }
-                    };
-                    respond(JSON.stringify(errorResponse));
-                }
-            } else {
-                debug("Session not ready, queuing message");
-                this.messageQueue.push(input);
-            }
+            // For other messages, just log them
+            debug(`Unhandled message type: ${parsed.method}`);
             
         } catch (error) {
-            debug(`Failed to parse message: ${error}`);
+            debug(`Failed to parse single message: ${error}`);
+            debug(`Problematic message: ${message.substring(0, 200)}...`);
         }
     }
 
@@ -448,7 +423,12 @@ class LFFVibeGateway {
     }
 
     sendFallbackToolsList(requestId) {
-        debug("Sending fallback tools list to BigGo");
+        if (!requestId) {
+            debug("Skipping tools list - no request ID provided");
+            return;
+        }
+        
+        debug(`Sending fallback tools list to BigGo (ID: ${requestId})`);
         
         const toolsResponse = {
             jsonrpc: "2.0",
@@ -471,17 +451,17 @@ class LFFVibeGateway {
                     },
                     {
                         name: "mcp_lff-resume-analyzer_analyze_resume",
-                        description: "分析PDF履歷檔案。當用戶提供PDF路徑時使用此工具。需要參數：pdf_path(PDF檔案完整路徑) 和 job_requirements(目標職位需求描述，如不明確可用通用描述)",
+                        description: "Analyze PDF resume file. Use when user provides PDF path. Parameters: pdf_path (complete PDF file path) and job_requirements (target job requirements description)",
                         inputSchema: {
                             type: "object",
                             properties: {
                                 pdf_path: {
                                     type: "string",
-                                    description: "PDF檔案的完整路徑，例如：C:/Users/username/resume.pdf"
+                                    description: "Complete path to PDF file, e.g.: C:/Users/username/resume.pdf"
                                 },
                                 job_requirements: {
                                     type: "string",
-                                    description: "目標職位的具體需求描述，例如：'高級Python工程師，需3年經驗，熟悉Django/FastAPI，具備AI/ML背景，英文流利'"
+                                    description: "Specific job requirements, e.g.: 'Senior Python Engineer, 3 years experience, Django/FastAPI, AI/ML background, fluent English'"
                                 }
                             },
                             required: ["pdf_path", "job_requirements"]
@@ -489,7 +469,7 @@ class LFFVibeGateway {
                     },
                     {
                         name: "mcp_lff-resume-analyzer_analyze_resume_text",
-                        description: "分析履歷文字內容。當用戶提供履歷文字(非PDF檔案)時使用。需要參數：resume_text(履歷文字內容) 和 job_requirements(職位需求)",
+                        description: "Analyze resume text content. Use when user provides resume text (not PDF file). Parameters: resume_text (resume content) and job_requirements (job requirements)",
                         inputSchema: {
                             type: "object",
                             properties: {
@@ -510,7 +490,7 @@ class LFFVibeGateway {
         };
         
         respond(JSON.stringify(toolsResponse));
-        debug(`Sent ${toolsResponse.result.tools.length} tools to BigGo`);
+        debug(`Sent ${toolsResponse.result.tools.length} tools to BigGo with ID ${requestId}`);
     }
 }
 

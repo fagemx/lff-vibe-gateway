@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "lff-vibe-resume-analyzer": {
+      "transport": "stdio",
+      "enabled": true,
+      "command": "npx",
+      "args": ["-y", "@lff-vibe/mcp-gateway@latest", "serve"],
+      "env": {
+        "MCP_SERVER_URL": "https://mcpice.com",
+        "LFF_VIBE_API_KEY": "your-api-key-here",
+        "PYTHONIOENCODING": "utf-8",
+        "NODE_OPTIONS": "--max-old-space-size=4096"
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 {
   "name": "@lff-vibe/mcp-gateway",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "LFF-VIBE MCP Gateway - Connect to FastAPI-MCP Unified Resume Analysis Service via SSE Transport",
   "keywords": [
     "mcp",
