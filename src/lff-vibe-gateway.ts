@@ -20,6 +20,7 @@ const MCP_SERVER_URL = process.env.MCP_SERVER_URL || process.env.LFF_VIBE_SERVER
 const AUTHORIZATION = process.env.AUTHORIZATION || process.env.LFF_VIBE_API_KEY || "";
 
 const baseUrl = MCP_SERVER_URL;
+// FastAPI-MCP SSE transport endpoints
 const backendUrlSse = `${baseUrl}/sse`;
 const backendUrlMsg = `${baseUrl}/message`;
 

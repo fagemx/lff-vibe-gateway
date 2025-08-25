@@ -1,7 +1,7 @@
 {
   "name": "@lff-vibe/mcp-gateway",
-  "version": "0.1.6",
-  "description": "LFF-VIBE MCP Gateway - Connect BigGo MCP Client to LFF-VIBE Resume Analysis Service",
+  "version": "0.2.0",
+  "description": "LFF-VIBE MCP Gateway - Connect to FastAPI-MCP Unified Resume Analysis Service via SSE Transport",
   "keywords": [
     "mcp",
     "gateway",
@@ -31,7 +31,10 @@
   ],
   "scripts": {
     "test": "node --test",
-    "start": "node index.js"
+    "start": "node index.js",
+    "version": "echo $npm_package_version",
+    "prepublishOnly": "echo 'Ready to publish version' $npm_package_version",
+    "build": "echo 'Building LFF-VIBE Gateway v'$npm_package_version"
   },
   "publishConfig": {
     "access": "public"
