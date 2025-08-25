@@ -178,11 +178,17 @@ class LFFVibeGateway {
 
         debug("LFF-VIBE MCP Gateway is running and ready");
         
-        // For SSE mode, we don't need to POST initialize
-        // The session is established via SSE stream
+        // Mark as ready first
         this.isReady = true;
         this.sessionInitialized = true;
+        
+        // Process any queued messages
         this.processQueuedMessages();
+        
+        // Auto-request tools from backend to populate the tools list
+        setTimeout(() => {
+            this.requestToolsFromBackend();
+        }, 500);
     }
 
     async sendMessageToBackend(message) {
@@ -293,12 +299,12 @@ class LFFVibeGateway {
             // Let's try a simplified approach
             
             if (parsed.method === "initialize") {
-                // Send a mock successful initialize response
+                // Send initialize response with actual tools
                 const initResponse = {
                     jsonrpc: "2.0",
                     id: parsed.id,
                     result: {
-                        protocolVersion: "1.0.0",
+                        protocolVersion: "2024-11-05",
                         capabilities: {
                             tools: {}
                         },
@@ -309,6 +315,64 @@ class LFFVibeGateway {
                     }
                 };
                 respond(JSON.stringify(initResponse));
+                
+                // Immediately request tools from backend after initialization
+                setTimeout(() => {
+                    this.requestToolsFromBackend();
+                }, 100);
+                return;
+            }
+            
+            if (parsed.method === "tools/list") {
+                // Handle tools/list request
+                debug("Received tools/list request from BigGo");
+                if (this.isReady && this.sessionId) {
+                    try {
+                        await this.sendMessageToBackend(message);
+                    } catch (error) {
+                        debug(`Failed to get tools: ${error.message}`);
+                        // Send fallback tools list
+                        this.sendFallbackToolsList(parsed.id);
+                    }
+                } else {
+                    this.sendFallbackToolsList(parsed.id);
+                }
+                return;
+            }
+            
+            if (parsed.method === "tools/call") {
+                // Handle tool calls - forward to backend
+                debug(`Received tools/call request: ${parsed.params?.name}`);
+                if (this.isReady && this.sessionId) {
+                    try {
+                        await this.sendMessageToBackend(message);
+                    } catch (error) {
+                        debug(`Failed to call tool: ${error.message}`);
+                        // Send error response
+                        const errorResponse = {
+                            jsonrpc: "2.0",
+                            id: parsed.id,
+                            error: {
+                                code: -32603,
+                                message: "Tool call failed",
+                                data: error.message
+                            }
+                        };
+                        respond(JSON.stringify(errorResponse));
+                    }
+                } else {
+                    // Send error if session not ready
+                    const errorResponse = {
+                        jsonrpc: "2.0",
+                        id: parsed.id,
+                        error: {
+                            code: -32002,
+                            message: "Server not ready",
+                            data: "MCP session not established"
+                        }
+                    };
+                    respond(JSON.stringify(errorResponse));
+                }
                 return;
             }
             
@@ -360,6 +424,93 @@ class LFFVibeGateway {
             this.eventSource.close();
         }
         debug("LFF-VIBE Gateway cleanup completed");
+    }
+
+    async requestToolsFromBackend() {
+        if (!this.isReady || !this.sessionId) {
+            debug("Cannot request tools: session not ready");
+            return;
+        }
+
+        debug("Requesting tools list from LFF-VIBE backend");
+        const toolsRequest = {
+            jsonrpc: "2.0",
+            id: "tools-request-1",
+            method: "tools/list",
+            params: {}
+        };
+
+        try {
+            await this.sendMessageToBackend(JSON.stringify(toolsRequest));
+        } catch (error) {
+            debug(`Failed to request tools from backend: ${error.message}`);
+        }
+    }
+
+    sendFallbackToolsList(requestId) {
+        debug("Sending fallback tools list to BigGo");
+        
+        const toolsResponse = {
+            jsonrpc: "2.0",
+            id: requestId,
+            result: {
+                tools: [
+                    {
+                        name: "mcp_lff-resume-analyzer_check_services",
+                        description: "Check if backend services are running",
+                        inputSchema: {
+                            type: "object",
+                            properties: {
+                                random_string: {
+                                    type: "string",
+                                    description: "Dummy parameter for no-parameter tools"
+                                }
+                            },
+                            required: ["random_string"]
+                        }
+                    },
+                    {
+                        name: "mcp_lff-resume-analyzer_analyze_resume",
+                        description: "分析PDF履歷檔案。當用戶提供PDF路徑時使用此工具。需要參數：pdf_path(PDF檔案完整路徑) 和 job_requirements(目標職位需求描述，如不明確可用通用描述)",
+                        inputSchema: {
+                            type: "object",
+                            properties: {
+                                pdf_path: {
+                                    type: "string",
+                                    description: "PDF檔案的完整路徑，例如：C:/Users/username/resume.pdf"
+                                },
+                                job_requirements: {
+                                    type: "string",
+                                    description: "目標職位的具體需求描述，例如：'高級Python工程師，需3年經驗，熟悉Django/FastAPI，具備AI/ML背景，英文流利'"
+                                }
+                            },
+                            required: ["pdf_path", "job_requirements"]
+                        }
+                    },
+                    {
+                        name: "mcp_lff-resume-analyzer_analyze_resume_text",
+                        description: "分析履歷文字內容。當用戶提供履歷文字(非PDF檔案)時使用。需要參數：resume_text(履歷文字內容) 和 job_requirements(職位需求)",
+                        inputSchema: {
+                            type: "object",
+                            properties: {
+                                resume_text: {
+                                    type: "string",
+                                    description: "Resume text content"
+                                },
+                                job_requirements: {
+                                    type: "string",
+                                    description: "Job requirements description"
+                                }
+                            },
+                            required: ["resume_text", "job_requirements"]
+                        }
+                    }
+                ]
+            }
+        };
+        
+        respond(JSON.stringify(toolsResponse));
+        debug(`Sent ${toolsResponse.result.tools.length} tools to BigGo`);
     }
 }
 
