@@ -9,10 +9,10 @@
  * Licensed under the Apache License, Version 2.0
  */
 
-// Import and start the main gateway
-import('./lff-vibe-gateway.js').then(module => {
-    // The main module will handle everything
+// Import and start the enhanced gateway
+import('./lff-vibe-gateway-enhanced.js').then(module => {
+    // The enhanced module will handle everything
 }).catch(error => {
-    console.error('Failed to start LFF-VIBE Gateway:', error);
+    console.error('Failed to start LFF-VIBE Gateway Enhanced:', error);
     process.exit(1);
 });

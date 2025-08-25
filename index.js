@@ -231,37 +231,40 @@ class LFFVibeGateway {
 }
 
 /**
- * Main serve function that starts the LFF-VIBE MCP Gateway
+ * Main serve function that starts the Enhanced LFF-VIBE MCP Gateway
  */
 export async function serve() {
-    debug(`Starting LFF-VIBE MCP Gateway...`);
+    // Import enhanced gateway dynamically
+    const { LFFVibeGatewayEnhanced } = await import('./src/lff-vibe-gateway-enhanced.js');
+    
+    debug(`Starting LFF-VIBE MCP Gateway Enhanced...`);
     debug(`Connecting to: ${baseUrl}`);
     debug(`Authorization: ${AUTHORIZATION ? 'Configured' : 'Not configured'}`);
     
-    const gateway = new LFFVibeGateway();
+    const gateway = new LFFVibeGatewayEnhanced();
 
     try {
         await gateway.connect();
         
-        // Handle stdin from Claude Desktop
+        // Handle stdin from BigGo Client
         process.stdin.on("data", (data) => gateway.processMessage(data));
         
         // Graceful shutdown handlers
         process.on('SIGINT', () => {
-            debug("Shutting down LFF-VIBE Gateway (SIGINT)...");
+            debug("Shutting down LFF-VIBE Gateway Enhanced (SIGINT)...");
             gateway.cleanup();
             process.exit(0);
         });
         
         process.on('SIGTERM', () => {
-            debug("Shutting down LFF-VIBE Gateway (SIGTERM)...");
+            debug("Shutting down LFF-VIBE Gateway Enhanced (SIGTERM)...");
             gateway.cleanup();
             process.exit(0);
         });
         
-        debug("LFF-VIBE MCP Gateway is running and ready");
+        debug("LFF-VIBE MCP Gateway Enhanced is running and ready");
     } catch (error) {
-        debug(`Fatal error in LFF-VIBE Gateway: ${error.message}`);
+        debug(`Fatal error in LFF-VIBE Gateway Enhanced: ${error.message}`);
         debug(`Error stack: ${error.stack}`);
         process.exit(1);
     }
